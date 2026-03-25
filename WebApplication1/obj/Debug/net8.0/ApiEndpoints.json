@@ -1,0 +1,48 @@
+[
+  {
+    "ContainingType": "CarPooling.Controllers.VoznjeController",
+    "Method": "GetGradovi",
+    "RelativePath": "api/Voznje/gradovi",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "CarPooling.Controllers.VoznjeController",
+    "Method": "Pretraga",
+    "RelativePath": "api/Voznje/pretraga",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "odGrada",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "doGrada",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "datumIVreme",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "page",
+        "Type": "System.Int32",
+        "IsRequired": false
+      },
+      {
+        "Name": "pageSize",
+        "Type": "System.Int32",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  }
+]
