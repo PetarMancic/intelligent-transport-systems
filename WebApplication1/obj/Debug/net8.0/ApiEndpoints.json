@@ -1,18 +1,8 @@
 [
   {
     "ContainingType": "CarPooling.Controllers.VoznjeController",
-    "Method": "GetGradovi",
-    "RelativePath": "api/Voznje/gradovi",
-    "HttpMethod": "GET",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "CarPooling.Controllers.VoznjeController",
-    "Method": "Pretraga",
-    "RelativePath": "api/Voznje/pretraga",
+    "Method": "FindRoutes",
+    "RelativePath": "api/Voznje",
     "HttpMethod": "GET",
     "IsController": true,
     "Order": 0,
@@ -28,21 +18,26 @@
         "IsRequired": false
       },
       {
-        "Name": "datumIVreme",
+        "Name": "vreme",
         "Type": "System.String",
         "IsRequired": false
       },
       {
-        "Name": "page",
-        "Type": "System.Int32",
-        "IsRequired": false
-      },
-      {
-        "Name": "pageSize",
+        "Name": "maxPresedanja",
         "Type": "System.Int32",
         "IsRequired": false
       }
     ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "CarPooling.Controllers.VoznjeController",
+    "Method": "GetCities",
+    "RelativePath": "api/Voznje/cities",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
     "ReturnTypes": []
   }
 ]

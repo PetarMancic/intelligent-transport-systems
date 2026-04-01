@@ -1,222 +1,330 @@
-﻿using Microsoft.EntityFrameworkCore;
-using CarPooling.Data;
-using CarPooling.DTOs;
-using CarPooling.Models;
-using System;
-using System.Diagnostics;
+﻿//using CarPooling.Data;
+//using Microsoft.EntityFrameworkCore;
+////using CarPooling.Data;
+////using CarPooling.DTOs;
+////using CarPooling.Models;
+////using QuickGraph;
+////using System;
+////using Itinero;
+//using Npgsql;
+////using Dapper;
+////using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
-namespace CarPooling.Services;
+//namespace CarPooling.Services;
 
-public class VoznjaService
-{
-    private readonly AppDbContext _db;
+//public class VoznjaService
+//{
+//    private readonly AppDbContext _db;
 
-    private const double UticajVremenaPolaska = 0.40;
-    private const double UticajBrojaStanica = 0.15;
-    private const double UticajTrajanjaPutovanja = 0.45;
-    private const int MaksimalnaDozvoljenRazlikaMinuta = 90;
+//    // Parametri za presedanja
+//    private const int MinBufferPresedanjeMin = 15;
+//    private const int MaxCekanjePresedanjeMin = 180;
+//    private const double PenalPoPresedanju = 35.0; // Povećan penal da bi direktne rute dominirale
 
-    public VoznjaService(AppDbContext db)
-    {
-        _db = db;
-    }
+//    private readonly string _connectionString;
 
-    /// <summary>
-    /// Vraca listu svih gradova koji se pojavljuju u bazi —
-    /// kao pocetni grad, krajnji grad ili usputna stanica.
-    /// Rezultat je sortiran azbucno i bez duplikata.
-    /// Koristi se za popunjavanje dropdown-a na frontendu.
-    /// </summary>
-    public async Task<List<string>> GetSviGradovi()
-    {
-        var sw2 = Stopwatch.StartNew();
-        var novoResenje = await _db.Voznje
-            .Select(v => v.PocetniGrad)
-            .Union(_db.Voznje.Select(v => v.KrajnjiGrad))
-            .Union(_db.UsputneStanice.Select(s => s.Stanica))
-            .OrderBy(g => g)
-            .ToListAsync();
+//    public VoznjaService(AppDbContext db, IConfiguration configuration)
+//    {
+//        _db = db;
+//        _connectionString = configuration.GetConnectionString("Default")
+//                        ?? throw new ArgumentNullException("Konekcija pod imenom 'Default' nije nađena!");
+//    }
 
-        return novoResenje;
-    }
+//    //    // Pomoćna klasa za graf
+//    //    private class VoznjaGrana : IEdge<string>
+//    //    {
+//    //        public string Source { get; set; } = "";
+//    //        public string Target { get; set; } = "";
+//    //        public RezultatPretrage Match { get; set; } = null!;
+//    //        public DateTime VremePolaska { get; set; }
+//    //        public DateTime VremeDolaska { get; set; }
+//    //        public int VoznjaId { get; set; }
+//    //    }
 
-    /// <summary>
-    /// Glavna metoda pretrage — pronalazi sve voznje koje odgovaraju
-    /// putnikovim zahtevima i rangira ih po skoru podudarnosti.
-    /// 
-    /// Logika:
-    /// 1. Iz baze izvlaci voznje za zadati datum gde vozac prolazi kroz
-    ///    polazni grad putnika u zadato vreme ili kasnije.
-    /// 2. Svaka voznja prolazi kroz PokusajPoklapanje koji proverava
-    ///    redosled stanica i hard limit od 90 minuta razlike.
-    /// 3. Preostale voznje se normalizuju — skor svakog parametra
-    ///    (kasnjenje, broj stanica, trajanje) racuna se relativno
-    ///    unutar skupa rezultata, a ne prema fiksnoj skali.
-    /// 4. Rezultati se sortiraju po ukupnom skoru .
-    /// </summary>
-    /// <param name="polaznaDestinacija">Grad ukrcavanja putnika</param>
-    /// <param name="odredisnaDestinacija">Grad iskrcavanja putnika</param>
-    /// <param name="datumIVreme">Zeljeno vreme polaska u formatu ISO 8601 (npr. 2026-03-22T08:00:00)</param>
-    /// <param name="page">Broj stranice (pocinje od 1)</param>
-    /// <param name="pageSize">Broj rezultata po stranici</param>
-    /// <returns>Lista rangiranih voznji za trenutnu stranicu i ukupan broj rezultata</returns>
-    public async Task<(List<RezultatPretrage>, int Total)> PronadjiNajoptimalnijuVoznju(
-    string polaznaDestinacija,
-    string odredisnaDestinacija,
-    string datumIVreme,
-    int page = 1,
-    int pageSize = 5)
-    {
-        var zeljenoVreme = DateTime.Parse(datumIVreme);
+//    // --- VRACENA METODA ---
+//    public async Task<List<string>> GetSviGradovi()
+//    {
+//        return await _db.Voznje
+//            .Select(v => v.PocetniGrad)
+//            .Union(_db.Voznje.Select(v => v.KrajnjiGrad))
+//            .Union(_db.UsputneStanice.Select(s => s.Stanica))
+//            .OrderBy(g => g)
+//            .ToListAsync();
+//    }
+//}
 
-        var datumSamo = zeljenoVreme.Date; // 2026-03-22
+////    public async Task<(List<UniverzalniRezultat> Items, int Total)> PronadjiSveVoznje(
+////        string polazna, string odredisna, string datumIVreme, int page = 1, int pageSize = 20)
+////    {
+////        // 1. Pronađi direktne vožnje
+////        var (direktne, _) = await PronadjiNajoptimalnijuVoznju(polazna, odredisna, datumIVreme, 1, 999);
 
-        var voznje = await _db.Voznje
-            .Include(v => v.UsputneStanice)
-            .Where(v => (
-                (v.PocetniGrad == polaznaDestinacija
-                    && v.VremePolaska.Date == datumSamo
-                    && v.VremePolaska >= zeljenoVreme)
-                ||
-                v.UsputneStanice.Any(s =>
-                    s.Stanica == polaznaDestinacija
-                    && s.VremeDolaska.Date == datumSamo
-                    && s.VremeDolaska >= zeljenoVreme)
-            ) && (
-                v.KrajnjiGrad == odredisnaDestinacija ||
-                v.UsputneStanice.Any(s => s.Stanica == odredisnaDestinacija)
-            ))
-            .ToListAsync();
+////        // 2. Pronađi presedanja (QuickGraph Engine)
+////        var (presedanja, _) = await PronadjiVoznjeGraf(polazna, odredisna, datumIVreme);
 
-        var kandidati = new List<RezultatPretrage>();
-        foreach (var voznja in voznje)
-        {
-            var match = PokusajPoklapanje(voznja, polaznaDestinacija, odredisnaDestinacija, zeljenoVreme);
-            if (match is not null)
-                kandidati.Add(match);
-        }
+////        // 3. STROGO FILTRIRANJE
+////        // Filtriramo presedanja: 
+////        // - ID vožnji moraju biti unikatni (ne smeš presedati u ista kola)
+////        // - Ako putanja već postoji kao direktna, ne nudi je kao presedanje
+////        var filtriranaPresedanja = presedanja
+////            .Where(p => p.Deonice.Select(d => d.VoznjaId).Distinct().Count() == p.Deonice.Count)
+////            .Where(p => !direktne.Any(d => p.Deonice.Any(deonica => deonica.VoznjaId == d.VoznjaId)))
+////            .ToList();
 
-        // Normalizuj scoreTrajanjaVoznje relativno unutar skupa rezultata
-        if (kandidati.Count > 0)
-        {
-            // Normalizacija kašnjenja
-            double minKasnjenje = kandidati.Min(r => r.RazlikaVremeMin);
-            double maxKasnjenje = kandidati.Max(r => r.RazlikaVremeMin);
+////        var sve = direktne.Select(d => new UniverzalniRezultat
+////        {
+////            JePresedanje = false,
+////            Direktna = d,
+////            Score = Math.Max(0, d.Score + 20)
+////        })
+////        .Concat(filtriranaPresedanja.Select(p => new UniverzalniRezultat
+////        {
+////            JePresedanje = true,
+////            Presedanje = p,
+////            Score = Math.Max(0, p.Score)
+////        }))
+////        .OrderByDescending(r => r.Score)
+////        .ToList();
 
+////        var total = sve.Count;
+////        var items = sve.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+////        return (items, total);
+////    }
 
-            double minTrajanje = kandidati.Min(r => r.TrajanjePutnikoveDeoniceMin);
-            double maxTrajanje = kandidati.Max(r => r.TrajanjePutnikoveDeoniceMin);
+////    public async Task<(List<RezultatPretrage>, int Total)> PronadjiNajoptimalnijuVoznju(
+////        string polazna, string odredisna, string datumIVreme, int page = 1, int pageSize = 5)
+////    {
+////        var zeljeno = DateTime.Parse(datumIVreme);
+////        var voznje = await _db.Voznje.Include(v => v.UsputneStanice)
+////            .Where(v => v.VremePolaska.Date == zeljeno.Date).ToListAsync();
 
+////        var kandidati = new List<RezultatPretrage>();
+////        foreach (var v in voznje)
+////        {
+////            var m = PokusajPoklapanje(v, polazna, odredisna, zeljeno);
+////            if (m != null) kandidati.Add(m);
+////        }
 
-            // Normalizacija stanica
-            double minBrojUsputnihStanica = kandidati.Min(r => r.StaniceIzmedju);
-            double maxBrojUsputnihStanice = kandidati.Max(r => r.StaniceIzmedju);
+////        if (kandidati.Any()) SkorujDirektne(kandidati);
 
-            foreach (var k in kandidati)
-            {
-                double scoreTrajanje = (maxTrajanje == minTrajanje)
-                    ? 100
-                    : 100 - ((k.TrajanjePutnikoveDeoniceMin - minTrajanje) / (maxTrajanje - minTrajanje) * 100);
+////        return (kandidati, kandidati.Count);
+////    }
 
-                double scoreKasnjenje = (maxKasnjenje == minKasnjenje)
-                    ? 100
-                    : 100 - ((k.RazlikaVremeMin - minKasnjenje) / (maxKasnjenje - minKasnjenje) * 100);
+////    private async Task<(List<RezultatPresedanja>, int Total)> PronadjiVoznjeGraf(string polazna, string odredisna, string datum)
+////    {
+////        var zeljeno = DateTime.Parse(datum);
+////        var sveVoznje = await _db.Voznje.Include(v => v.UsputneStanice)
+////            .Where(v => v.VremePolaska.Date == zeljeno.Date).ToListAsync();
 
-                double scoreStanice = (maxBrojUsputnihStanice == minBrojUsputnihStanica)
-                    ? 100
-                    : 100 - ((k.StaniceIzmedju - minBrojUsputnihStanica) / (maxBrojUsputnihStanice - minBrojUsputnihStanica) * 100);
+////        var graf = new AdjacencyGraph<string, VoznjaGrana>(true);
+////        foreach (var v in sveVoznje)
+////        {
+////            var tacke = IzgradiTackeRute(v);
+////            for (int i = 0; i < tacke.Count - 1; i++)
+////            {
+////                for (int j = i + 1; j < tacke.Count; j++)
+////                {
+////                    var m = PokusajPoklapanje(v, tacke[i].Grad, tacke[j].Grad, tacke[i].Vreme);
+////                    if (m != null) graf.AddVerticesAndEdge(new VoznjaGrana
+////                    {
+////                        Source = tacke[i].Grad,
+////                        Target = tacke[j].Grad,
+////                        VoznjaId = v.Id,
+////                        VremePolaska = tacke[i].Vreme,
+////                        VremeDolaska = tacke[j].Vreme,
+////                        Match = m
+////                    });
+////                }
+////            }
+////        }
 
-                k.ScoreVremeKasnjenja = Math.Round(scoreKasnjenje, 2);
-                k.ScoreStanice = Math.Round(scoreStanice, 2);
+////        var rezultati = new List<RezultatPresedanja>();
+////        if (graf.ContainsVertex(polazna) && graf.ContainsVertex(odredisna))
+////            NadjiSvePutanje(graf, polazna, odredisna, zeljeno, new List<VoznjaGrana>(), new HashSet<string> { polazna }, rezultati, 3);
 
-                k.Score = Math.Round(
-                    (scoreKasnjenje * UticajVremenaPolaska) +
-                    (scoreStanice * UticajBrojaStanica) +
-                    (scoreTrajanje * UticajTrajanjaPutovanja), 1);
-            }
-        }
+////        SkorujPresedanja(rezultati);
+////        return (rezultati, rezultati.Count);
+////    }
 
-        var sortirani = kandidati.OrderByDescending(r => r.Score).ToList();
-        var total = sortirani.Count;
-        var items = sortirani
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToList();
+////    private void NadjiSvePutanje(AdjacencyGraph<string, VoznjaGrana> graf, string trenutni, string cilj,
+////        DateTime vremeStizanja, List<VoznjaGrana> putanja, HashSet<string> poseceni, List<RezultatPresedanja> rezultati, int maxD)
+////    {
+////        if (putanja.Count >= maxD || !graf.TryGetOutEdges(trenutni, out var grane)) return;
 
-        return (items, total);
-    }
+////        foreach (var g in grane)
+////        {
+////            // ZABRANA ISTE VOZNJE I CIKLUSA
+////            if (putanja.Any(p => p.VoznjaId == g.VoznjaId) || poseceni.Contains(g.Target)) continue;
 
-    /// <summary>
-    /// Pokusava da upari vozacevu voznju sa putnikovim zahtevom.
-    /// 
-    /// Proverava:
-    /// - Da li je grad ukrcavanja pre grada iskrcavanja na ruti
-    /// - Da li razlika izmedju vozacevog prolaska kroz polazni grad
-    ///   i putnikovog zeljenog vremena nije veca od MaksimalnaDozvoljenRazlikaMinuta
-    /// 
-    /// Ako provera prodje, vraca popunjen RezultatPretrage sa sirim vrednostima
-    /// (Score = 0, bice izracunat naknadno u PronadjiNajoptimalnijuVoznju).
-    /// Ako ne prodje, vraca null.
-    /// </summary>
-    /// <param name="vozacevaVoznja">Voznja iz baze sa usputnim stanicama</param>
-    /// <param name="odGrada">Grad ukrcavanja putnika</param>
-    /// <param name="doGrada">Grad iskrcavanja putnika</param>
-    /// <param name="zeljenoVremePolaskaPutnika">Zeljeno vreme polaska putnika</param>
-    /// <returns>RezultatPretrage ako voznja odgovara, null ako ne odgovara</returns>
-    private RezultatPretrage? PokusajPoklapanje(
-    Voznja vozacevaVoznja,
-    string odGrada,
-    string doGrada,
-    DateTime zeljenoVremePolaskaPutnika)
-    {
-        var staniceVozaceveVoznje = vozacevaVoznja.UsputneStanice.OrderBy(s => s.VremeDolaska).ToList();
+////            // PROVERA VREMENA + BUFFER
+////            var minP = putanja.Count == 0 ? vremeStizanja : vremeStizanja.AddMinutes(MinBufferPresedanjeMin);
+////            if (g.VremePolaska < minP || (g.VremePolaska - vremeStizanja).TotalMinutes > MaxCekanjePresedanjeMin) continue;
 
-        var tackeRuteVozaceveVoznje = new List<(string Grad, DateTime Vreme)>
-        {
-            (vozacevaVoznja.PocetniGrad, vozacevaVoznja.VremePolaska)
-        };
+////            var novaP = new List<VoznjaGrana>(putanja) { g };
+////            if (g.Target == cilj)
+////            {
+////                rezultati.Add(new RezultatPresedanja
+////                {
+////                    Deonice = novaP.Select(x => x.Match).ToList(),
+////                    UkupnoTrajanjeSaWait = (int)(g.VremeDolaska - novaP[0].VremePolaska).TotalMinutes
+////                });
+////            }
+////            else
+////            {
+////                var noviPos = new HashSet<string>(poseceni) { g.Target };
+////                NadjiSvePutanje(graf, g.Target, cilj, g.VremeDolaska, novaP, noviPos, rezultati, maxD);
+////            }
+////        }
+////    }
 
-        foreach (var s in staniceVozaceveVoznje)
-            tackeRuteVozaceveVoznje.Add((s.Stanica, s.VremeDolaska));
+////    private RezultatPretrage? PokusajPoklapanje(Voznja v, string odG, string doG, DateTime zeljeno)
+////    {
+////        var t = IzgradiTackeRute(v);
+////        int i1 = t.FindIndex(x => x.Grad == odG), i2 = t.FindIndex(x => x.Grad == doG);
+////        if (i1 == -1 || i2 == -1 || i1 >= i2) return null;
 
-        tackeRuteVozaceveVoznje.Add((vozacevaVoznja.KrajnjiGrad, vozacevaVoznja.VremeDolaska));
+////        return new RezultatPretrage
+////        {
+////            VoznjaId = v.Id,
+////            PocetniGrad = v.PocetniGrad,
+////            KrajnjiGrad = v.KrajnjiGrad,
+////            VremePolaska = v.VremePolaska.ToString("HH:mm"),
+////            VremeDolaska = v.VremeDolaska.ToString("HH:mm"),
+////            VremeUlaska = t[i1].Vreme.ToString("HH:mm"),
+////            VremeIzlaska = t[i2].Vreme.ToString("HH:mm"),
+////            TrajanjePutnikoveDeoniceMin = (int)(t[i2].Vreme - t[i1].Vreme).TotalMinutes,
+////            RazlikaVremeMin = (int)Math.Abs((t[i1].Vreme - zeljeno).TotalMinutes),
+////            StaniceIzmedju = i2 - i1 - 1,
+////            UsputneStanice = v.UsputneStanice.OrderBy(s => s.VremeDolaska).Select(s => $"{s.Stanica} ({s.VremeDolaska:HH:mm})").ToList()
+////        };
+////    }
 
+////    private List<(string Grad, DateTime Vreme)> IzgradiTackeRute(Voznja v)
+////    {
+////        var l = new List<(string, DateTime)> { (v.PocetniGrad, v.VremePolaska) };
+////        l.AddRange(v.UsputneStanice.OrderBy(s => s.VremeDolaska).Select(s => (s.Stanica, s.VremeDolaska)));
+////        l.Add((v.KrajnjiGrad, v.VremeDolaska));
+////        return l;
+////    }
 
-        int indeksGradaUkrcavanjaPutnika = tackeRuteVozaceveVoznje.FindIndex(t => t.Grad == odGrada);
-        int indeksGradaIskrcavanjaPutnika = tackeRuteVozaceveVoznje.FindIndex(t => t.Grad == doGrada);
+////    private void SkorujDirektne(List<RezultatPretrage> k)
+////    {
+////        if (!k.Any()) return;
+////        var minT = k.Min(x => x.TrajanjePutnikoveDeoniceMin);
+////        var maxT = k.Max(x => x.TrajanjePutnikoveDeoniceMin);
+////        var minK = k.Min(x => x.RazlikaVremeMin);
+////        var maxK = k.Max(x => x.RazlikaVremeMin);
 
-        if (indeksGradaUkrcavanjaPutnika == -1 ||  indeksGradaIskrcavanjaPutnika == -1 ||  indeksGradaUkrcavanjaPutnika >= indeksGradaIskrcavanjaPutnika)
-                 return null;
+////        foreach (var r in k)
+////        {
+////            double sT = maxT == minT ? 100 : 100 - ((r.TrajanjePutnikoveDeoniceMin - minT) / (double)(maxT - minT) * 100);
+////            double sK = maxK == minK ? 100 : 100 - ((r.RazlikaVremeMin - minK) / (double)(maxK - minK) * 100);
+////            r.Score = Math.Round(sT * 0.5 + sK * 0.5, 1);
+////        }
+////    }
 
-        var vremeDolaskaNaPickupGrad = tackeRuteVozaceveVoznje[indeksGradaUkrcavanjaPutnika].Vreme;
-        var vremeDolaskaNaDropoffGrad = tackeRuteVozaceveVoznje[indeksGradaIskrcavanjaPutnika].Vreme;
+////    private void SkorujPresedanja(List<RezultatPresedanja> k)
+////    {
+////        if (!k.Any()) return;
+////        var minT = k.Min(x => x.UkupnoTrajanjeSaWait);
+////        var maxT = k.Max(x => x.UkupnoTrajanjeSaWait);
+////        foreach (var r in k)
+////        {
+////            double sT = maxT == minT ? 100 : 100 - ((r.UkupnoTrajanjeSaWait - minT) / (double)(maxT - minT) * 100);
+////            r.Score = Math.Round(sT - (r.Deonice.Count - 1) * PenalPoPresedanju, 1);
+////        }
+////    }
+////    public async Task<List<VoznjaSaPresedanjemDto>> PronadjiSveMoguceOpcije(string odGrada, string doGrada, string vreme)
+////    {
+////        DateTime datumVreme = DateTime.Parse(vreme);
 
-        double kasnjenjePolaskaUMinutima = Math.Abs((vremeDolaskaNaPickupGrad - zeljenoVremePolaskaPutnika).TotalMinutes);
+////        // Koristimo @odrediste umesto @do da izbegnemo Postgres error
+////        string sql = @"
+////WITH SveDionice AS (
+////    -- 1. DIREKTNE LINIJE (A-G) + SVE STANICE
+////    SELECT 
+////        v.""Id"" AS ""VoznjaId"", 
+////        v.""PocetniGrad"" AS ""Polaziste"", 
+////        v.""KrajnjiGrad"" AS ""Odrediste"", 
+////        v.""VremePolaska"" AS ""VremeOd"", 
+////        v.""VremeDolaska"" AS ""VremeDo"",
+////        (SELECT STRING_AGG(us.""Stanica"", ',' ORDER BY us.""VremeDolaska"") 
+////         FROM usputne_stanice us WHERE us.""VoznjaId"" = v.""Id"") AS ""StaniceSve""
+////    FROM voznje v
 
-        if (kasnjenjePolaskaUMinutima > MaksimalnaDozvoljenRazlikaMinuta)
-            return null;
+////    UNION ALL
 
-        int brojStanicaIzmedjuPutnikovihGradova = indeksGradaIskrcavanjaPutnika - indeksGradaUkrcavanjaPutnika - 1;
-        double trajanjePutnikovogPutovanjaMin = (vremeDolaskaNaDropoffGrad - vremeDolaskaNaPickupGrad).TotalMinutes;
+////    -- 2. OD POČETKA DO USPUTNE (A-E) + STANICE IZMEĐU
+////    SELECT 
+////        v.""Id"", v.""PocetniGrad"", us.""Stanica"", v.""VremePolaska"", us.""VremeDolaska"",
+////        (SELECT STRING_AGG(us2.""Stanica"", ',' ORDER BY us2.""VremeDolaska"") 
+////         FROM usputne_stanice us2 
+////         WHERE us2.""VoznjaId"" = v.""Id"" AND us2.""VremeDolaska"" < us.""VremeDolaska"")
+////    FROM voznje v
+////    JOIN usputne_stanice us ON v.""Id"" = us.""VoznjaId""
 
-        return new RezultatPretrage
-        {
-            VoznjaId = vozacevaVoznja.Id,
-            PocetniGrad = vozacevaVoznja.PocetniGrad,
-            KrajnjiGrad = vozacevaVoznja.KrajnjiGrad,
-            VremePolaska = vozacevaVoznja.VremePolaska.ToString("HH:mm"),
-            VremeDolaska = vozacevaVoznja.VremeDolaska.ToString("HH:mm"),
-            VremeUlaska = vremeDolaskaNaPickupGrad.ToString("HH:mm"),
-            VremeIzlaska = vremeDolaskaNaDropoffGrad.ToString("HH:mm"),
-            StaniceIzmedju = brojStanicaIzmedjuPutnikovihGradova,
-            TrajanjePutnikoveDeoniceMin = (int)trajanjePutnikovogPutovanjaMin,
-            RazlikaVremeMin = (int)kasnjenjePolaskaUMinutima,
-            ScoreVremeKasnjenja = 0,  // popuniće se u PronadjiNajoptimalnijuVoznju
-            ScoreStanice = 0,  // popuniće se u PronadjiNajoptimalnijuVoznju
-            Score = 0,  // popuniće se u PronadjiNajoptimalnijuVoznju
-            UsputneStanice = staniceVozaceveVoznje
-                .Select(s => $"{s.Stanica} ({s.VremeDolaska:HH:mm})")
-                .ToList()
-        };
-    }
-}
+////    UNION ALL
+
+////    -- 3. OD USPUTNE DO KRAJA (E-G) + STANICE IZMEĐU
+////    SELECT 
+////        v.""Id"", us.""Stanica"", v.""KrajnjiGrad"", us.""VremeDolaska"", v.""VremeDolaska"",
+////        (SELECT STRING_AGG(us2.""Stanica"", ',' ORDER BY us2.""VremeDolaska"") 
+////         FROM usputne_stanice us2 
+////         WHERE us2.""VoznjaId"" = v.""Id"" AND us2.""VremeDolaska"" > us.""VremeDolaska"")
+////    FROM voznje v
+////    JOIN usputne_stanice us ON v.""Id"" = us.""VoznjaId""
+////),
+////SveOpcije AS (
+////    -- SCENARIO: DIREKTNA VOZNJA (npr. ID 3)
+////    SELECT 
+////        ""VoznjaId"" AS ""Bus1Id"", 
+////        NULL AS ""Bus2Id"", 
+////        ""Polaziste"" AS ""Start"", 
+////        NULL AS ""PresedanjeU"", 
+////        ""Odrediste"" AS ""Cilj"", 
+////        ""VremeOd"" AS ""PolazakPirot"", 
+////        ""VremeDo"" AS ""DolazakBeograd"",
+////        ""VremeOd"" AS ""PolazakDalje"", -- Za direktnu je isto
+////        ""VremeDo"" AS ""DolazakPresedanje"", -- Za direktnu je isto
+////        ""StaniceSve"" AS ""StaniceSegment1"",
+////        NULL AS ""StaniceSegment2""
+////    FROM SveDionice 
+////    WHERE ""Polaziste"" = @polaziste AND ""Odrediste"" = @odrediste AND ""VremeOd"" >= @vremePocetka
+
+////    UNION ALL
+
+////    -- SCENARIO: PRESEDANJA (1+2, 1+3)
+////    SELECT 
+////        v1.""VoznjaId"", 
+////        v2.""VoznjaId"", 
+////        v1.""Polaziste"", 
+////        v1.""Odrediste"" AS ""PresedanjeU"", 
+////        v2.""Odrediste"", 
+////        v1.""VremeOd"", 
+////        v2.""VremeDo"",
+////        v2.""VremeOd"" AS ""PolazakDalje"",
+////        v1.""VremeDo"" AS ""DolazakPresedanje"",
+////        v1.""StaniceSve"" AS ""StaniceSegment1"",
+////        v2.""StaniceSve"" AS ""StaniceSegment2""
+////    FROM SveDionice v1
+////    JOIN SveDionice v2 ON v1.""Odrediste"" = v2.""Polaziste""
+////    WHERE v1.""Polaziste"" = @polaziste 
+////      AND v2.""Odrediste"" = @odrediste 
+////      AND v2.""VremeOd"" > v1.""VremeDo"" 
+////      AND v1.""VoznjaId"" <> v2.""VoznjaId""
+////)
+////SELECT * FROM SveOpcije ORDER BY ""PolazakPirot"" ASC;";
+
+////        using (var connection = new NpgsqlConnection(_connectionString))
+////        {
+////            var result = await connection.QueryAsync<VoznjaSaPresedanjemDto>(sql, new
+////            {
+////                polaziste = odGrada,
+////                odrediste = doGrada,
+////                vremePocetka = datumVreme
+////            });
+
+////            return result.ToList();
+////        }
+////    }
+////}

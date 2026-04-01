@@ -1,6 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using CarPooling.Services;
-using System.Diagnostics;
+﻿using CarPooling.Services;
+using Microsoft.AspNetCore.Mvc;
+using WebApplication1.Services;
 
 namespace CarPooling.Controllers;
 
@@ -8,49 +8,39 @@ namespace CarPooling.Controllers;
 [Route("api/[controller]")]
 public class VoznjeController : ControllerBase
 {
-    private readonly VoznjaService _service;
+    private readonly PresedanjeService1 _transferService1;
+    private readonly ScoringService _scoringService;
 
-    public VoznjeController(VoznjaService service)
+    public VoznjeController(   PresedanjeService1 service1, ScoringService scoringService )
     {
-        _service = service;
+        _transferService1 = service1;
+        _scoringService = scoringService;
     }
 
-    [HttpGet("gradovi")]
-    public async Task<IActionResult> GetGradovi()
+    [HttpGet("cities")]
+    public async Task<IActionResult> GetCities()
     {
-        var gradovi = await _service.GetSviGradovi();
-        return Ok(gradovi);
+        var cities = await _transferService1.GetAllCities();
+        return Ok(cities);
     }
-    [HttpGet("pretraga")]
-    public async Task<IActionResult> Pretraga(
+
+    [HttpGet]
+    public async Task<IActionResult> FindRoutes(
         [FromQuery] string odGrada,
         [FromQuery] string doGrada,
-        [FromQuery] string datumIVreme,
-        [FromQuery] int page,
-        [FromQuery] int pageSize)
+        [FromQuery] string vreme,
+        [FromQuery] int maxPresedanja = 1)
     {
-        if (string.IsNullOrWhiteSpace(odGrada) ||
-            string.IsNullOrWhiteSpace(doGrada) ||
-            string.IsNullOrWhiteSpace(datumIVreme))
-        {
-            return BadRequest("Parametri odGrada, doGrada i vreme su obavezni.");
-        }
+        if (string.IsNullOrWhiteSpace(odGrada) || string.IsNullOrWhiteSpace(doGrada) || string.IsNullOrWhiteSpace(vreme))
+            return BadRequest("Parameters fromCity, toCity, and departureTime are required.");
 
-        try
-        {
-            var (items,total) = await _service.PronadjiNajoptimalnijuVoznju(odGrada, doGrada, datumIVreme, page, pageSize);
-            return Ok(new
-                {
-                items,
-                total,
-                page,
-                pageSize,
-                totalPages=(int)Math.Ceiling(total/(double)pageSize)
-            });
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(ex.Message);
-        }
+        if (maxPresedanja < 0 || maxPresedanja > 3)
+            return BadRequest("maxTransfers must be between 0 and 3.");
+
+
+        var requestedTime = DateTime.Parse(vreme);
+        var routes = await _transferService1.FindRoutes(odGrada, doGrada, vreme, maxPresedanja);
+        var result = _scoringService.RankAllRoutes(routes, requestedTime);
+        return Ok(result);
     }
 }

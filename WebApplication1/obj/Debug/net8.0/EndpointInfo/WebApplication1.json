@@ -5,7 +5,7 @@
     "version": "1.0"
   },
   "paths": {
-    "/api/Voznje/gradovi": {
+    "/api/Voznje/cities": {
       "get": {
         "tags": [
           "Voznje"
@@ -17,7 +17,7 @@
         }
       }
     },
-    "/api/Voznje/pretraga": {
+    "/api/Voznje": {
       "get": {
         "tags": [
           "Voznje"
@@ -38,26 +38,19 @@
             }
           },
           {
-            "name": "datumIVreme",
+            "name": "vreme",
             "in": "query",
             "schema": {
               "type": "string"
             }
           },
           {
-            "name": "page",
+            "name": "maxPresedanja",
             "in": "query",
             "schema": {
               "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "pageSize",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int32"
+              "format": "int32",
+              "default": 1
             }
           }
         ],

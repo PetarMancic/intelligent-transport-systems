@@ -34,3 +34,11 @@ C:\FAX\MASTER\inteligentni test\WebApplication1\WebApplication1\obj\Debug\net8.0
 C:\FAX\MASTER\inteligentni test\WebApplication1\WebApplication1\obj\Debug\net8.0\WebApplication1.pdb
 C:\FAX\MASTER\inteligentni test\WebApplication1\WebApplication1\obj\Debug\net8.0\WebApplication1.genruntimeconfig.cache
 C:\FAX\MASTER\inteligentni test\WebApplication1\WebApplication1\obj\Debug\net8.0\ref\WebApplication1.dll
+C:\FAX\MASTER\inteligentni test\WebApplication1\WebApplication1\bin\Debug\net8.0\QuickGraph.Data.dll
+C:\FAX\MASTER\inteligentni test\WebApplication1\WebApplication1\bin\Debug\net8.0\QuickGraph.Graphviz.dll
+C:\FAX\MASTER\inteligentni test\WebApplication1\WebApplication1\bin\Debug\net8.0\QuickGraph.Serialization.dll
+C:\FAX\MASTER\inteligentni test\WebApplication1\WebApplication1\bin\Debug\net8.0\QuickGraph.dll
+C:\FAX\MASTER\inteligentni test\WebApplication1\WebApplication1\obj\Debug\net8.0\WebApplication1.sourcelink.json
+C:\FAX\MASTER\inteligentni test\WebApplication1\WebApplication1\bin\Debug\net8.0\Itinero.dll
+C:\FAX\MASTER\inteligentni test\WebApplication1\WebApplication1\bin\Debug\net8.0\Reminiscence.dll
+C:\FAX\MASTER\inteligentni test\WebApplication1\WebApplication1\bin\Debug\net8.0\Dapper.dll

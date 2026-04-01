@@ -2,12 +2,15 @@
 using CarPooling.Data;
 using CarPooling.Services;
 using System;
+using WebApplication1.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ── Baza podataka ─────────────────────────────────────────────────────────────
+// Database
 var connectionString = builder.Configuration.GetConnectionString("Default")
     ?? "Host=localhost;Port=5432;Database=carpooling;Username=postgres;Password=postgres";
+
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
@@ -15,11 +18,12 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 
-// ── Servisi ───────────────────────────────────────────────────────────────────
-builder.Services.AddScoped<VoznjaService>();
+//Services
+//builder.Services.AddScoped<VoznjaService>();
+builder.Services.AddScoped<PresedanjeService1>();
+builder.Services.AddScoped<ScoringService>();
 builder.Services.AddControllers();
 
-// ── CORS — dozvoljava Lovable frontend da gada API ────────────────────────────
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
@@ -28,7 +32,6 @@ builder.Services.AddCors(options =>
               .AllowAnyHeader());
 });
 
-// ── Swagger (opciono, korisno za testiranje) ──────────────────────────────────
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
