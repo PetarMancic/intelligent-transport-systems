@@ -88,7 +88,7 @@ public class PresedanjeService1
         {
             // --- FILTER 1: VREME POLASKA 
             // Ako bus kreće u 08:00, a putnik je rekao da može tek od 09:00 -> PRESKOČI
-            if (dionica.VremeOd < najranijeMoguceVreme)
+            if (dionica.VremeOd < najranijeMoguceVreme)// da li ce putnik stici u grad (najranije moguce vreme ) pre nego sto vozac polazi iz nove deonica dalje (donica.VremeOd
             {
                 continue;
             }
